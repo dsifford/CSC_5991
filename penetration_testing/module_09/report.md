@@ -1,75 +1,141 @@
 # Documentation
 
-Make sure you include all pertinent information that you find in your lab
-report. This is the documentation that you will need to substantiate the
-vulnerabilities that you describe in the summary penetration report after
-completing all the labs.
+## Lab 01: Take advantage of a misconfigured service.
 
-While you do not need screen shots of everything that you do, you do need to
-document everything that you do. For example, you might do a scan of all the
-open ports on a server, sending the results to a file. You may then do a “grep”
-of the file showing all the active ports. You should capture the results of the
-“grep”, which may be a few screen shots. You do not need to capture screen shots
-for the complete scan.
+`nmap` scan of target machine showing `nfs` available on port `2049`
 
-Some information that you find may not seem important now, but could prove
-useful as you continue your testing. For this reason, you should be as thorough
-as possible in documenting your work.
+```
+$ nmap -p0-65536 192.168.2.85
+[...]
+2049/tcp  open  nfs
+[...]
+```
 
-You should add descriptive captions to your screen shots. This will help you to
-remember the specifics of each screen shot.
+`showmount` is used to list the shared filesystems. Here we see that the root
+filesystem is shared.
 
-A well-documented lab report is important for the following reasons:
+```
+$ showmount -e 192.168.2.85
+Export list for 192.168.2.85:
+/ *
+```
 
-*   This documentation is a record of the work that you performed.
-*   This documentation is how you prove that a particular vulnerability exits.
-*   This documentation describes how you can recreate the vulnerability.
+We then mount the root filesystem to a temp directory on our local system and
+add our public ssh key to the remote target's `authorized_keys` file so that we
+can have root-level ssh access without a password in the future
+
+## Lab 02: Crack Linux passwords using John the Ripper.
+
+In this exercise, we copy over the `/etc/passwd` and `/etc/shadow` file from the
+target over to our local system and run John the Ripper to unhash the passwords
+for each service.
+
+The following passwords are discovered:
+
+| Service  | Password    |
+| -------- | ----------- |
+| postgres | `postgres`  |
+| msfadmin | `msfadmin`  |
+| service  | `service`   |
+| sys      | `batman`    |
+| klog     | `123456789` |
+| user     | `toor`      |
+
+## Lab 03: Backdoors
+
+In this exercise we attempt to locate a backdoor using vulnerable software.
+
+After doing a quick `nmap` port scan of port 21 (FTP), we identify that the
+target is using `vsftpd v2.3.4`.
+
+```
+$ nmap -A -p 21 192.168.2.85
+[...]
+PORT    STATE SERVICE VERSION
+21/tcp  open  ftp     vsftpd 2.3.4
+[...]
+```
+
+Looking through www.exploit-db.com, we discover that there is a known
+vulnerability, including a Metasploitable module, for this version of the
+`vsftpd` software that allows "Backdoor Command Execution". This should suit our
+needs nicely.
+
+We then quickly verify that the vulnerability exists using telnet. Confirmed.
+
+Next, we compromise the system using Metasplot and the
+`exploit/unix/ftp/vsftpd_234_backdoor` module.
 
 # Vulnerabilities
 
-Note: If you do not discover any vulnerabilities in a particular lab, enter “No
-vulnerabilities discovered in this lab.” under the “Vulnerabilities” heading,
-and delete the remaining subheadings.
+## Vulnerability (Lab 01)
 
-## Vulnerability 01
+Root filesystem is being shared publicly over `nfs`
 
 ### Description
 
-Describe each vulnerability that you discover as a separate entry. Provide
-enough detail so that someone reading your lab report can understand the
-vulnerability.
+The metasploitable VM has their root filesystem shared with the public over
+`nfs`. This is a potentially catestrophic vulnerability and should be fixed
+immediately as it allows anyone to take over the entire system.
 
 ### Risk
 
-The risk associated with this vulnerability depends on the impact to the
-organization that owns this network. Since neither the organization that owns
-this network, nor the manner in which the organization uses the network, has
-been identified, we can’t accurately identify the risk.
+**Impact:** 10/10
 
-However, you should make an attempt to identify the risk of each vulnerability.
+**Probability:** 8/10
 
-Here is one process for calculating risk magnitude:
-
-*   Calculate the impact if the vulnerability is breached on a 1 to 10 scale
-    (where 1 equals the least severe or least probable impact and 10 equals the
-    most severe or most probable impact).
-*   Calculate the probability that the vulnerability is breached on a 1 to 10
-    scale (where 1 equals extremely unlikely to occur and 10 equals almost
-    certain to occur).
-*   Risk magnitude is calculated by multiplying the impact by the probability.
+**Magnitude:** 0.8
 
 ### Mitigation
 
-Describe the mitigation for this risk.
+The mitigation of this risk involves closing the `nfs` port completely from the
+public. If a certain directory is meant to be publically available, then that
+directory only should be shared.
 
-Describe the residual risk.
+## Vulnerability (Lab 02)
 
-## Vulnerability 02
-
-(Add an additional section for each vulnerability that you discovered.)
+Use of default passwords for services and weak passwords for users.
 
 ### Description
 
+The system uses passwords that are easily guessable and easily cracked using
+public password lists. This is a problem because it creates an attack vector for
+bad actors to gain access to these services.
+
 ### Risk
 
+**Impact:** 8/10
+
+**Probability:** 9/10
+
+**Magnitude:** 0.81
+
 ### Mitigation
+
+Change the passwords to something more secure and educate your users about the
+use of secure passwords
+
+## Vulnerability (Lab 03)
+
+Located software that has a preinstalled backdoor.
+
+### Description
+
+The `vsftpd 2.3.4` software has a known backdoor compromising the codebase. This
+backdoor allows hackers to gain root access to any system that is running the
+software. This is an extremely dangerous and critical vulnerability and should
+be addressed as soon as possible.
+
+
+### Risk
+
+**Impact:** 10/10
+
+**Probability:** 9/10
+
+**Magnitude:** 0.9
+
+### Mitigation
+
+To mitigate this vulnerability, install a software update or patch as soon as possible.
+
